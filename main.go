@@ -23,8 +23,10 @@ import (
 	"log"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -75,10 +77,8 @@ func (p *Processor) Process() error {
 		panic(err)
 	}
 
-	//processesByLibrary := ProcessesByLibrary{}
-	//librariesByProcess := LibrariesByProcess{}
 	for elem, problemId := range pList {
-		exposedEntitiesList, err := p.getSecurityProblemInfo(problemId)
+		processList, err := p.getSecurityProblemInfo(problemId)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -86,95 +86,17 @@ func (p *Processor) Process() error {
 		if p.Config.Verbose {
 			fmt.Printf("%d. %s\n", elem, problemId)
 		}
-		for _, exposedEntity := range exposedEntitiesList {
-			fmt.Printf("%s,%s,%s,%s\n", exposedEntity.SecurityProblemId, exposedEntity.CveId, exposedEntity.ProcessInstanceName, exposedEntity.HostInstanceName)
-			/*fmt.Fprintf(%s","%s,)
-			fmt.Println("ProblemId=" + exposedEntity.SecurityProblemId)
-			fmt.Println("CveId=" + exposedEntity.CveId)
-			fmt.Println("ProcessInstanceId=" + exposedEntity.ProcessInstanceId)
-			fmt.Println("ProcessInstanceName=" + exposedEntity.ProcessInstanceName)
-			fmt.Println("HostInstanceName=" + exposedEntity.HostInstanceName)
-			//fmt.Println("Library=" + securityProblem.Library)
-			*/
-			/*for _, process := range securityProblem.ProcessInstanceNameList {
-				fmt.Println(process)
-			}*/
-			/*if !p.Config.GroupByProcess {
-				processNames, found := processesByLibrary[securityProblem.Library]
-				if !found {
-					processNames = &ProcessNames{ProcessInstanceNames: []string{}}
-					processesByLibrary[securityProblem.Library] = processNames
-				}
+		if p.Config.ShowOnlyExposedEntities {
+			for _, exposedEntity := range processList {
+				fmt.Printf("%s,%s,%s,%s,%s\n", exposedEntity.Status, exposedEntity.SecurityProblemId, exposedEntity.CveId, exposedEntity.ProcessInstanceName, exposedEntity.HostInstanceName)
+			}
+		} else {
+			for _, vulnerableProcess := range processList {
+				fmt.Printf("%s,%s,%s,%s,%s,%s\n", vulnerableProcess.Status, vulnerableProcess.SecurityProblemId, vulnerableProcess.CveId, vulnerableProcess.ProcessInstanceName, vulnerableProcess.HostInstanceName, vulnerableProcess.FileName)
+			}
 
-				for _, processName := range securityProblem.ProcessInstanceNameList {
-					found = false
-					for _, pName := range processNames.ProcessInstanceNames {
-						if pName == processName {
-							found = true
-							break
-						}
-					}
-
-					if !found {
-						processNames.ProcessInstanceNames = append(processNames.ProcessInstanceNames, processName)
-					}
-				}
-			} else {
-				libraryName := securityProblem.Library
-				for _, processName := range securityProblem.ProcessInstanceNameList {
-					lNames, found := librariesByProcess[processName]
-					if !found {
-						librariesByProcess[processName] = &Libraries{LibraryNames: []string{libraryName}}
-					} else {
-						found = false
-						for _, lName := range lNames.LibraryNames {
-							if lName == libraryName {
-								found = true
-								break
-							}
-						}
-						if !found {
-							lNames.LibraryNames = append(lNames.LibraryNames, libraryName)
-						}
-					}
-				}
-			}*/
 		}
 	}
-
-	/*if p.Config.Verbose {
-		fmt.Println("===========================================")
-		fmt.Println("Process Cache Entries")
-		fmt.Println("===========================================")
-		for processId, name := range *p.ProcessInstanceCache {
-			fmt.Printf("%s: %s\n", processId, *name)
-		}
-		fmt.Println("===========================================")
-	}
-
-	if !p.Config.GroupByProcess {
-		for key, pByLibrary := range processesByLibrary {
-			fmt.Printf(key + ",")
-			for idx, value := range pByLibrary.ProcessInstanceNames {
-				fmt.Printf(value)
-				if idx < len(pByLibrary.ProcessInstanceNames)-1 {
-					fmt.Printf(",")
-				}
-			}
-			fmt.Println()
-		}
-	} else {
-		for key, lbyProcess := range librariesByProcess {
-			fmt.Printf(key + ",")
-			for idx, value := range lbyProcess.LibraryNames {
-				fmt.Printf(value)
-				if idx < len(lbyProcess.LibraryNames)-1 {
-					fmt.Printf(",")
-				}
-			}
-			fmt.Println()
-		}
-	}*/
 	return nil
 }
 
@@ -182,6 +104,9 @@ func (p *Processor) getSecurityProblemList(endpointName string) ([]string, error
 	var err error
 	var req *http.Request
 	endpointURL := p.Config.URL + endpoints[endpointName]
+	if p.Config.Filter != "" {
+		endpointURL += "&securityProblemSelector=" + url.QueryEscape(p.Config.Filter)
+	}
 	if req, err = p.setupHTTPRequest("GET", endpointURL); err != nil {
 		return nil, err
 	}
@@ -198,10 +123,15 @@ func (p *Processor) getSecurityProblemList(endpointName string) ([]string, error
 	return pList, nil
 }
 
-func (p *Processor) getSecurityProblemInfo(problemId string) ([]*ExposedEntityInfo, error) {
+func (p *Processor) getSecurityProblemInfo(problemId string) ([]*ProcessInfo, error) {
 	var err error
 	var req *http.Request
-	endpointURL := p.Config.URL + endpoints["SecurityProblems"] + "/" + problemId + "?fields=%2BexposedEntities"
+	var endpointURL string
+	if p.Config.ShowOnlyExposedEntities {
+		endpointURL = p.Config.URL + endpoints["SecurityProblems"] + "/" + problemId + "?fields=" + url.QueryEscape("+exposedEntities")
+	} else {
+		endpointURL = p.Config.URL + endpoints["SecurityProblems"] + "/" + problemId + "?fields=" + url.QueryEscape("+vulnerableComponents")
+	}
 	if req, err = p.setupHTTPRequest("GET", endpointURL); err != nil {
 		return nil, err
 	}
@@ -242,16 +172,12 @@ func (p *Processor) setupHTTPRequest(method string, endpointURL string) (*http.R
 	}
 	req.Header.Set("accept", "application/json; charset=utf-8")
 
-	/*if p.Config.Debug {
-		log.Println(fmt.Sprintf("  [HTTP] %s: %s", "Authorization", "Api-Token "+p.Config.APIToken))
-	}*/
 	req.Header.Add("Authorization", "Api-Token "+p.Config.APIToken)
 
 	return req, nil
 }
 
 func (p *Processor) processSecurityProblemsResponse(resp *http.Response) ([]string, error) {
-	//fmt.Println("processResponse")
 	body, _ := ioutil.ReadAll(resp.Body)
 
 	if p.Config.Debug {
@@ -284,7 +210,7 @@ func (p *Processor) processSecurityProblemsResponse(resp *http.Response) ([]stri
 	return pList, nil
 }
 
-func (p *Processor) processProblemInfoResponse(resp *http.Response) ([]*ExposedEntityInfo, error) {
+func (p *Processor) processProblemInfoResponse(resp *http.Response) ([]*ProcessInfo, error) {
 	//fmt.Println("processResponse")
 	body, _ := ioutil.ReadAll(resp.Body)
 
@@ -303,34 +229,65 @@ func (p *Processor) processProblemInfoResponse(resp *http.Response) ([]*ExposedE
 		return nil, &errorEnvelope
 	}
 	var securityProblemInfoEnvelope SecurityProblemInfoEnvelope
+	// The API returns same processes multiple times when vulnerableComponents are used. Keeping this list
+	// so that this util does not insert duplicate records
+	var processedProcessIds []string
 	json.Unmarshal([]byte(body), &securityProblemInfoEnvelope)
 	if p.Config.Debug {
 		log.Println("ProblemId=" + securityProblemInfoEnvelope.SecurityProblemId)
-		//		log.Println(&securityProblemInfoEnvelope)
 	}
 
-	var infoList []*ExposedEntityInfo
+	var infoList []*ProcessInfo
 	// Concatinating all CVEs into one string
 	cveId := strings.Join(securityProblemInfoEnvelope.CveIds, ";")
 
-	for _, exposedEntity := range securityProblemInfoEnvelope.ExposedEntities {
-		if p.Config.Debug {
-			log.Println(exposedEntity)
-			log.Println(cveId)
-		}
+	if p.Config.ShowOnlyExposedEntities {
+		for _, processInfo := range securityProblemInfoEnvelope.ExposedEntities {
+			if p.Config.Debug {
+				log.Println(processInfo)
+				log.Println(cveId)
+			}
 
-		info := &ExposedEntityInfo{}
-		//		if len(compList.VulnerableProcesses) > 0 {
-		info.SecurityProblemId = securityProblemInfoEnvelope.SecurityProblemId
-		info.ProcessInstanceId = exposedEntity
-		info.CveId = cveId
-		infoList = append(infoList, info)
-		//		}
+			info := &ProcessInfo{}
+			//		if len(compList.VulnerableProcesses) > 0 {
+			info.SecurityProblemId = securityProblemInfoEnvelope.SecurityProblemId
+			info.ProcessInstanceId = processInfo
+			info.CveId = cveId
+			info.Status = securityProblemInfoEnvelope.Status
+			infoList = append(infoList, info)
+			//		}
+		}
+	} else {
+		for _, processInfo := range securityProblemInfoEnvelope.VulnerableComponents {
+			if p.Config.Debug {
+				log.Println(processInfo)
+				log.Println(cveId)
+			}
+			//		if len(compList.VulnerableProcesses) > 0 {
+			for _, vComponent := range processInfo.VulnerableProcesses {
+				// Sometimes only HOSTs are vulnerable e.g. in K8s vulnerabilities. Ignoring HOST vulnerable component
+				if !strings.HasPrefix(vComponent, "PROCESS") {
+					continue
+				}
+				if Contains(processedProcessIds, vComponent) {
+					continue
+				}
+				processedProcessIds = append(processedProcessIds, vComponent)
+				info := &ProcessInfo{}
+				info.SecurityProblemId = securityProblemInfoEnvelope.SecurityProblemId
+				info.ProcessInstanceId = vComponent
+				info.FileName = processInfo.FileName
+				info.Status = securityProblemInfoEnvelope.Status
+				info.CveId = cveId
+				infoList = append(infoList, info)
+			}
+			//		}
+		}
 	}
 	return infoList, nil
 }
 
-func (p *Processor) getProcessInstanceData(list []*ExposedEntityInfo) error {
+func (p *Processor) getProcessInstanceData(list []*ProcessInfo) error {
 	var err error
 	var req *http.Request
 	//var info *SecurityProblemInfo
@@ -432,11 +389,13 @@ func (p *Processor) checkProcessCache(processId string) (*ProcessEnvelope, bool)
 
 // Config a simple configuration object
 type Config struct {
-	URL            string
-	APIToken       string
-	Verbose        bool
-	Debug          bool
-	GroupByProcess bool
+	URL                     string
+	APIToken                string
+	Verbose                 bool
+	Debug                   bool
+	ShowOnlyExposedEntities bool
+	ShowAllEntities         bool
+	Filter                  string
 }
 
 // Parse reads configuration from arguments and environment
@@ -445,13 +404,32 @@ func (c *Config) Parse() *Config {
 	flag.StringVar(&c.APIToken, "token", "", "the API token to use for uploading configuration")
 	flag.BoolVar(&c.Verbose, "verbose", false, "verbose logging")
 	flag.BoolVar(&c.Debug, "debug", false, "prints out HTTP traffic")
-	flag.BoolVar(&c.GroupByProcess, "groupByProcess", false, "group the output by process name and show all the vulnerable libraries in it")
+	flag.BoolVar(&c.ShowOnlyExposedEntities, "showOnlyExposedEntities", false, "show only those entities that have public internet exposure")
+	flag.BoolVar(&c.ShowAllEntities, "showAllEntities", false, "show all processes, security info and the current status of the vulnerability")
+	flag.StringVar(&c.Filter, "filter", "", "use filter to search for certain set of CVEs. For multiple CVEs, separate them by comma. CVEs are case sensitive")
 	flag.Parse()
 	c.URL = c.Lookup("DT_URL", c.URL)
 	c.APIToken = c.Lookup("DT_TOKEN", c.APIToken)
 	if len(c.URL) == 0 || len(c.APIToken) == 0 {
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	if !c.ShowAllEntities && !c.ShowOnlyExposedEntities {
+		fmt.Print("Choose at least one of the options: showOnlyExposedEntities or showOnlyExposedEntities")
+		os.Exit(1)
+	}
+	if c.ShowAllEntities && c.ShowOnlyExposedEntities {
+		fmt.Print("Choose either showOnlyExposedEntities or showOnlyExposedEntities but not both")
+		os.Exit(1)
+	}
+	if c.Filter != "" {
+		cveIdList := strings.Split(c.Filter, ",")
+		var quotedCveIds []string
+		for _, cve := range cveIdList {
+			quotedCveIds = append(quotedCveIds, strconv.Quote(cve))
+		}
+		c.Filter = "cveId(" + strings.Join(quotedCveIds, ",") + ")"
 	}
 	return c
 }
@@ -526,6 +504,16 @@ func (eps Endpoints) Contains(fileInfo os.FileInfo) bool {
 	return found
 }
 
+func Contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
+}
+
 type SecurityProblemInfo struct {
 	SecurityProblemId   string
 	ExposedEntities     string
@@ -535,12 +523,14 @@ type SecurityProblemInfo struct {
 	HostInstanceName    string
 }
 
-type ExposedEntityInfo struct {
+type ProcessInfo struct {
 	SecurityProblemId   string
+	Status              string
 	CveId               string
 	ProcessInstanceId   string
 	ProcessInstanceName string
 	HostInstanceName    string
+	FileName            string
 }
 
 type LibrariesByProcess map[string]*Libraries
@@ -604,17 +594,19 @@ type SecurityProblem struct {
 
 // SecurityProblemInfoEnvelope contains the successful response from the API endpoint
 type SecurityProblemInfoEnvelope struct {
-	SecurityProblemId string `json:"securityProblemId"`
-	//VulnerableComponents []*Library `json:"vulnerableComponents"`
-	ExposedEntities []string `json:"exposedEntities"`
-	CveIds          []string `json:"cveIds"`
+	SecurityProblemId    string                 `json:"securityProblemId"`
+	Status               string                 `json:"status"`
+	VulnerableComponents []*VulnerableComponent `json:"vulnerableComponents"`
+	ExposedEntities      []string               `json:"exposedEntities"`
+
+	CveIds []string `json:"cveIds"`
 }
 
 // VulnerableComponent has no documentation
-type Library struct {
+type VulnerableComponent struct {
 	DisplayName         string   `json:"displayName"`
-	VulnerableProcesses []string `json:"exposedEntities"`
-	CveIds              []string `json:"cveIds"`
+	VulnerableProcesses []string `json:"affectedEntities"`
+	FileName            string   `json:"fileName"`
 }
 
 // ProcessEnvelope contains the successful response from the API endpoint
