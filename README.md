@@ -25,9 +25,9 @@ This also allows you to filter the results by CVEIDS. To use the filter use the 
 <b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities} -filter={CVE-IDS that are comma separated}
 <br />
 
-###Example
-If you want to search for all processes that are affected by CVE-2021-44228, use the following command<br /></br>
-<b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> -showAllEntities -filter=CVE-2021-44228<br /></br>
+### Example
+If you want to search for all processes that are affected by CVE-2021-44228, use the following command
+<b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> -showAllEntities -filter=CVE-2021-44228
 <br />
 
 If you want to search for all processes that are affected by CVE-2021-44228 and CVE-2021-45105 use the following command<br /></br>
