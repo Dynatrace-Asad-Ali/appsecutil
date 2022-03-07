@@ -17,11 +17,10 @@ The API Token needs to have these minimum permissions:
 You can [download](https://github.com/Dynatrace-Asad-Ali/appsecutil/releases/latest) the utility for you OS here. Unzip the zip file before running the utility.
 
 ### Usage
-To run the utility execute the following command<br /></br >
+To run the utility execute the following command<
 ```$xslt
-<b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities}
+appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities}
 ```
-<br />
 
 This also allows you to filter the results by CVEIDS. To use the filter use the following command<br /></br>
 <b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities} -filter={CVE-IDS that are comma separated}
