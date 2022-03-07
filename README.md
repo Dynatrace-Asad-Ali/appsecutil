@@ -18,7 +18,9 @@ You can [download](https://github.com/Dynatrace-Asad-Ali/appsecutil/releases/lat
 
 ### Usage
 To run the utility execute the following command<br /></br >
+```$xslt
 <b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities}
+```
 <br />
 
 This also allows you to filter the results by CVEIDS. To use the filter use the following command<br /></br>
