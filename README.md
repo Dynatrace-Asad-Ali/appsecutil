@@ -17,25 +17,27 @@ The API Token needs to have these minimum permissions:
 You can [download](https://github.com/Dynatrace-Asad-Ali/appsecutil/releases/latest) the utility for you OS here. Unzip the zip file before running the utility.
 
 ### Usage
-To run the utility execute the following command<
+To run the utility execute the following command
 ```$xslt
 appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities}
 ```
 
-This also allows you to filter the results by CVEIDS. To use the filter use the following command<br /></br>
-<b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities} -filter={CVE-IDS that are comma separated}
-<br />
+This also allows you to filter the results by CVEIDS. To use the filter use the following command
+```$xslt
+appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> {-showOnlyExposedEntities|-showAllEntities} -filter={CVE-IDS that are comma separated}
+```
 
 ### Example
 If you want to search for all processes that are affected by CVE-2021-44228, use the following command
-<b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> -showAllEntities -filter=CVE-2021-44228
-<br />
+```$xslt
+appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> -showAllEntities -filter=CVE-2021-44228
+```
 
 If you want to search for all processes that are affected by CVE-2021-44228 and CVE-2021-45105 use the following command
 
-<b>appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> -showAllEntities -filter=CVE-2021-44228,CVE-2021-45105
-<br />
-
+```$xslt
+appsec_\<version\> -url <Dynatrace tenant url including https://> -token \<token\> -showAllEntities -filter=CVE-2021-44228,CVE-2021-45105
+```
 
 This utility generates an output to the console in the following format
 
